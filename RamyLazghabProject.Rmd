@@ -1,0 +1,203 @@
+---
+title: "Étude sur le Lien entre le Parcours Académique et la Satisfaction de Carrière"
+author: "Ramy Lazghab"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Introduction
+Ce rapport explore comment l'adéquation entre le rôle actuel d'un individu et ses compétences ou sa formation influence la satisfaction professionnelle.
+
+# Chargement des Données
+```{r load-data, echo=TRUE, message=FALSE, warning=FALSE}
+# Load necessary libraries
+library(tidyverse)
+# Load the dataset
+data <- read.csv("Data.csv", header = TRUE, sep = ",", fileEncoding = "ISO-8859-1")
+# View the structure of the dataset
+str(data)
+```
+
+```{r}
+# Load the dplyr package for data manipulation
+library(dplyr)
+
+# Recode Likert responses for Pertinence columns
+pertinence_columns <- grep("Pertinence", names(data), value = TRUE)
+data <- data %>%
+  mutate(across(all_of(pertinence_columns), 
+                ~ recode(., 
+                         "pdtd" = 1, 
+                         "Neutre" = 2, 
+                         "tafd" = 3, 
+                         .default = NA_real_)))
+
+# Recode Likert responses for Utilisation columns
+utilisation_columns <- grep("Utilisation", names(data), value = TRUE)
+data <- data %>%
+  mutate(across(all_of(utilisation_columns), 
+                ~ recode(., 
+                         "pdtd" = 1, 
+                         "Neutre" = 2, 
+                         "tafd" = 3, 
+                         .default = NA_real_)))
+
+# Recode Likert responses for Necessite columns
+necessite_columns <- grep("Necessite", names(data), value = TRUE)
+data <- data %>%
+  mutate(across(all_of(necessite_columns), 
+                ~ recode(., 
+                         "pdtd" = 1, 
+                         "Neutre" = 2, 
+                         "tafd" = 3, 
+                         .default = NA_real_)))
+
+# Check the results
+head(data)
+
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+
+# Select oui/Non columns
+yesno_columns <- grep("Objectifs", names(data), value = TRUE)
+
+# Recode Yes/No responses to 1 for "Oui" and 0 for "Non"
+data[yesno_columns] <- data[yesno_columns] %>%
+  mutate(across(everything(), ~ recode(., 
+    "Oui" = 1, 
+    "Non" = 0)))  # Recode Oui to 1, Non to 0
+
+# Check the transformation
+print(data[yesno_columns])
+```
+
+
+
+```{r}
+nrow(data)
+head(data)#to test if the first are changed correctly
+tail(data)#to test if the last are changed correctly
+```
+
+
+```{r}
+# Combine rows 1 to 6, 7 to 35, and 36 to 41
+all_rows <- rbind(data[1:6, ], data[7:35, ], data[36:41, ])
+nrow(all_rows)  # return 41 lines
+print(all_rows)
+View(all_rows)#see all_rows in the next tab contain all the answers changed 
+
+```
+
+```{r}
+write.csv(all_rows, "combined_data.csv", row.names = FALSE)#saving the data in new csv file
+
+```
+
+```{r}
+# Subset for PCA (numerical columns only)
+pca_data <- all_rows[, sapply(all_rows, is.numeric)]
+# Subset for MCA
+mca_data <- all_rows[, grep("Objectifs", colnames(all_rows))]
+# Check PCA data
+str(pca_data)
+
+# Check MCA data
+str(mca_data)
+
+
+```
+```{r}
+# Check for missing values in PCA data
+sum(is.na(pca_data))
+
+# Check for missing values in MCA data
+sum(is.na(mca_data))
+
+```
+```{r}
+# Impute missing values using the mean for PCA data
+pca_data[is.na(pca_data)] <- apply(pca_data, 2, mean, na.rm = TRUE)
+
+# If missing values exist, handle them
+mca_data[] <- lapply(mca_data, function(x) replace(x, is.na(x), names(sort(table(x), decreasing = TRUE))[1]))
+
+```
+
+```{r}
+# Standardize the data for PCA
+pca_data_scaled <- scale(pca_data)
+
+# Perform PCA on the scaled data
+pca_result <- prcomp(pca_data_scaled, center = TRUE, scale. = TRUE)
+
+# Check the summary of the PCA result
+summary(pca_result)
+
+# Plot the explained variance (scree plot)
+screeplot(pca_result, main = "Scree Plot", col = "blue")
+
+```
+```{r}
+# Plot the first two principal components
+plot(pca_result$x[, 1:2], col = "blue", pch = 16, main = "PCA - First two components")
+
+```
+```{r}
+# Convert columns to factors if they are not already
+mca_data[] <- lapply(mca_data, as.factor)
+# Remove rows with all NA values
+mca_data <- mca_data[complete.cases(mca_data), ]
+
+# Remove columns with all NA values or constant values
+mca_data <- mca_data[, apply(mca_data, 2, function(col) length(unique(col)) > 1)]
+
+
+```
+
+```{r}
+# Perform MCA
+mca_result <- MCA(mca_data, graph = FALSE)
+
+# Check the results
+summary(mca_result)
+
+# Plot the results (MCA biplot)
+plot(mca_result)
+
+```
+```{r}
+# Install factoextra if not already installed
+install.packages("factoextra")
+
+```
+
+
+```{r}
+# Check the dimensions of the MCA data
+dim(mca_data)
+
+```
+
+PCA(ACP) Treatment
+```{r}
+library(FactoMineR)
+pca_results <- PCA(pca_data, graph = TRUE)
+
+# Visualize PCA
+library(factoextra)
+fviz_pca_biplot(pca_results, label = "var", habillage = "age", addEllipses = TRUE)
+
+```
+MCA (ACM)Treatment
+```{r}
+mca_results <- MCA(mca_data, graph = TRUE)
+
+# Visualize MCA
+fviz_mca_biplot(mca_results, label = "var", habillage = "niveau_d_etude", addEllipses = TRUE)
+
+```
+
