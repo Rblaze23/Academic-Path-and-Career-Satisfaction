@@ -1,27 +1,42 @@
 ---
-title: "Étude sur le Lien entre le Parcours Académique et la Satisfaction de Carrière"
+title: "Study on the Link Between Academic Path and Career Satisfaction"
 author: "Ramy Lazghab"
 date: "`r Sys.Date()`"
 output: html_document
 ---
 
 # Introduction
-Ce rapport explore comment l'adéquation entre le rôle actuel d'un individu et ses compétences ou sa formation influence la satisfaction professionnelle.
+This report explores how the alignment between an individual's current role and their skills or education influences career satisfaction. We use Principal Component Analysis (PCA(ACP)) and Multiple Correspondence Analysis (MCA(ACM)) to examine the data.
+.
 
-# Chargement des Données
-```{r load-data, echo=TRUE, message=FALSE, warning=FALSE}
+```{r setup, include=FALSE}
 # Load necessary libraries
 library(tidyverse)
-# Load the dataset
-data <- read.csv("Data.csv", header = TRUE, sep = ",", fileEncoding = "ISO-8859-1")
-# View the structure of the dataset
-str(data)
-```
-
-```{r}
-# Load the dplyr package for data manipulation
+library(FactoMineR)
+library(factoextra)
+library(corrplot)
 library(dplyr)
+```
+# Data Loading
+We load the dataset from a CSV file and perform an initial inspection to understand its structure.
 
+```{r load-data}
+data <- read.csv("Data.csv", header = TRUE, sep = ",", fileEncoding = "ISO-8859-1")
+
+# Inspect the dataset
+str(data)          # Structure of the dataset
+summary(data)      # Summary statistics
+head(data)         # First few rows
+# Check for duplicates
+data <- distinct(data)
+```
+# Data Preprocessing
+We recode Likert-scale responses and Yes/No(oui/Non) columns and prepare subsets of data for PCA(ACP) and MCA(ACM).
+
+## Recoding Likert Responses
+Likert responses in the "Pertinence," "Utilisation," and "Necessite" columns are recoded into numeric values.
+
+```{r recode-likert}
 # Recode Likert responses for Pertinence columns
 pertinence_columns <- grep("Pertinence", names(data), value = TRUE)
 data <- data %>%
@@ -54,150 +69,143 @@ data <- data %>%
 
 # Check the results
 head(data)
-
 ```
+## Recoding Yes/No(Oui/Non) Columns
+Yes/No responses in the "Objectifs" columns are recoded to 1 for "Yes" and 0 for "No."
 
-```{r}
-# Load necessary libraries
-library(dplyr)
-
-# Select oui/Non columns
+```{r recode-yesno}
+# Select Oui/Non columns
 yesno_columns <- grep("Objectifs", names(data), value = TRUE)
 
 # Recode Yes/No responses to 1 for "Oui" and 0 for "Non"
 data[yesno_columns] <- data[yesno_columns] %>%
-  mutate(across(everything(), ~ recode(., 
-    "Oui" = 1, 
-    "Non" = 0)))  # Recode Oui to 1, Non to 0
+  mutate(across(everything(), ~ recode(., "Oui" = 1, "Non" = 0)))
 
 # Check the transformation
-print(data[yesno_columns])
+print(head(data[yesno_columns]))
 ```
 
+## Verifying and Saving Preprocessed Data
+We combine all rows and save the preprocessed data into a new CSV file.
 
 
-```{r}
-nrow(data)
-head(data)#to test if the first are changed correctly
-tail(data)#to test if the last are changed correctly
+```{r save-preprocessed-data}
+write.csv(data, "preprocessed_data.csv", row.names = FALSE)
 ```
 
+# Principal Component Analysis (PCA)
+We prepare numerical data for PCA and verify if this method is appropriate by examining variable correlations.
 
-```{r}
-# Combine rows 1 to 6, 7 to 35, and 36 to 41
-all_rows <- rbind(data[1:6, ], data[7:35, ], data[36:41, ])
-nrow(all_rows)  # return 41 lines
-print(all_rows)
-View(all_rows)#see all_rows in the next tab contain all the answers changed 
+## Preparing Data for PCA
+We select only numerical columns and standardize the data.
 
-```
-
-```{r}
-write.csv(all_rows, "combined_data.csv", row.names = FALSE)#saving the data in new csv file
-
-```
-
-```{r}
-# Subset for PCA (numerical columns only)
-pca_data <- all_rows[, sapply(all_rows, is.numeric)]
-# Subset for MCA
-mca_data <- all_rows[, grep("Objectifs", colnames(all_rows))]
-# Check PCA data
-str(pca_data)
-
-# Check MCA data
-str(mca_data)
-
-
-```
-```{r}
-# Check for missing values in PCA data
-sum(is.na(pca_data))
-
-# Check for missing values in MCA data
-sum(is.na(mca_data))
-
-```
-```{r}
-# Impute missing values using the mean for PCA data
-pca_data[is.na(pca_data)] <- apply(pca_data, 2, mean, na.rm = TRUE)
-
-# If missing values exist, handle them
-mca_data[] <- lapply(mca_data, function(x) replace(x, is.na(x), names(sort(table(x), decreasing = TRUE))[1]))
-
-```
-
-```{r}
-# Standardize the data for PCA
+```{r prepare-pca-data}
+pca_data <- data %>% select(where(is.numeric))
+# Impute missing values with column means
+pca_data[is.na(pca_data)] <- apply(pca_data, 2, function(x) mean(x, na.rm = TRUE))
+# Standardize data
 pca_data_scaled <- scale(pca_data)
+```
 
-# Perform PCA on the scaled data
+# Principal Component Analysis (PCA)
+We prepare numerical data for PCA and verify if this method is appropriate by examining variable correlations.
+
+## Preparing Data for PCA
+We select only numerical columns and standardize the data.
+
+```{r prepare-pca-data}
+pca_data <- data %>% select(where(is.numeric))
+# Impute missing values with column means
+pca_data[is.na(pca_data)] <- apply(pca_data, 2, function(x) mean(x, na.rm = TRUE))
+# Standardize data
+pca_data_scaled <- scale(pca_data)
+```
+## Checking Correlations
+We check correlations between variables to determine if PCA is appropriate.
+
+```{r check-correlations}
+cor_matrix <- cor(pca_data_scaled, use = "complete.obs")
+corrplot(cor_matrix, method = "circle", type = "upper", tl.col = "black", tl.srt = 45)
+```
+## Selecting Principal Components
+We evaluate eigenvalues, cumulative variance, and scree plots to determine the number of components to retain.
+Explain the "elbow" in the graph to justify the number of components retained.
+
+```{r select-components}
+# Eigenvalues and cumulative variance
+eig <- get_eigenvalue(prcomp(pca_data_scaled))
+print(eig)
+
+# Scree plot for visualizing explained variance
+fviz_screeplot(prcomp(pca_data_scaled), ncp = 10, addlabels = TRUE, ylim = c(0, 50))
+
+# Kaiser criterion: components with eigenvalues > 1
+eig_kaiser <- eig[eig$eigenvalue > 1, ]
+print(paste("Number of components based on Kaiser Criterion:", nrow(eig_kaiser)))
+```
+## Performing PCA
+We perform PCA and visualize the first two components.
+Discuss how variables are grouped and their alignment with axes (e.g., positive/negative correlations, key contributors).
+
+```{r}
+# Variable coordinates and contributions
+var <- get_pca_var(pca_result)
+print(var$coord)   # Coordinates of variables
+print(var$contrib) # Contributions of variables
+print(var$cos2)    # Cos² (quality of representation)
+
+# Visualization of variables
+fviz_pca_var(pca_result, col.var = "cos2") +
+  scale_color_gradient2(low = "white", mid = "blue", high = "red", midpoint = 0.6) +
+  theme_minimal()
+
+```
+Map individuals and explore clusters:
+Identify clusters or patterns among individuals and how they relate to components.
+```{r}
+# Individual coordinates, cos², and contributions
+ind <- get_pca_ind(pca_result)
+print(ind$coord)   # Coordinates of individuals
+print(ind$cos2)    # Cos² values
+print(ind$contrib) # Contributions of individuals
+
+# Visualization of individuals
+fviz_pca_ind(pca_result, geom = "point", col.ind = "cos2") +
+  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0.5) +
+  theme_minimal()
+
+```
+
+## Performing PCA
+We perform PCA and visualize the first two components.
+
+```{r perform-pca}
 pca_result <- prcomp(pca_data_scaled, center = TRUE, scale. = TRUE)
-
-# Check the summary of the PCA result
+# Summary of PCA
 summary(pca_result)
-
-# Plot the explained variance (scree plot)
+# Scree plot
 screeplot(pca_result, main = "Scree Plot", col = "blue")
-
+# Plot first two principal components
+plot(pca_result$x[, 1:2], col = "blue", pch = 16, main = "PCA - First Two Components")
 ```
-```{r}
-# Plot the first two principal components
-plot(pca_result$x[, 1:2], col = "blue", pch = 16, main = "PCA - First two components")
+# Multiple Correspondence Analysis (MCA)
+We prepare categorical data for MCA and analyze relationships between qualitative variables.
+## Preparing Data for MCA(ACM)
 
+```{r prepare-mca-data}
+mca_data <- data %>%
+  select(matches("Objectifs")) %>%
+  mutate(across(everything(), as.factor))
+# Remove columns with constant values or all NAs
+mca_data <- mca_data[, sapply(mca_data, function(col) length(unique(na.omit(col))) > 1)]
 ```
-```{r}
-# Convert columns to factors if they are not already
-mca_data[] <- lapply(mca_data, as.factor)
-# Remove rows with all NA values
-mca_data <- mca_data[complete.cases(mca_data), ]
+## Performing MCA
+Describe how categories are distributed and the relationships between individuals and categorical variables.
 
-# Remove columns with all NA values or constant values
-mca_data <- mca_data[, apply(mca_data, 2, function(col) length(unique(col)) > 1)]
-
-
-```
-
-```{r}
-# Perform MCA
+```{r perform-mca}
 mca_result <- MCA(mca_data, graph = FALSE)
-
-# Check the results
-summary(mca_result)
-
-# Plot the results (MCA biplot)
-plot(mca_result)
-
+# Visualize MCA(ACM) results
+fviz_mca_biplot(mca_result, geom = "point", col.var = "blue", col.ind = "red")
 ```
-```{r}
-# Install factoextra if not already installed
-install.packages("factoextra")
-
-```
-
-
-```{r}
-# Check the dimensions of the MCA data
-dim(mca_data)
-
-```
-
-PCA(ACP) Treatment
-```{r}
-library(FactoMineR)
-pca_results <- PCA(pca_data, graph = TRUE)
-
-# Visualize PCA
-library(factoextra)
-fviz_pca_biplot(pca_results, label = "var", habillage = "age", addEllipses = TRUE)
-
-```
-MCA (ACM)Treatment
-```{r}
-mca_results <- MCA(mca_data, graph = TRUE)
-
-# Visualize MCA
-fviz_mca_biplot(mca_results, label = "var", habillage = "niveau_d_etude", addEllipses = TRUE)
-
-```
-
+# Conclusion
+This report explored the relationships between academic paths and career satisfaction using PCA and MCA. The results helped identify key dimensions and qualitative relationships in the data.
