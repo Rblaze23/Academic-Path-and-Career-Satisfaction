@@ -103,23 +103,14 @@ We select only numerical columns and standardize the data.
 pca_data <- data %>% select(where(is.numeric))
 # Impute missing values with column means
 pca_data[is.na(pca_data)] <- apply(pca_data, 2, function(x) mean(x, na.rm = TRUE))
-# Standardize data
+# Standardize data Z= 
+#X−μ
+#____ = Dp^(−1/2)*(X−I⋅μ)
+#σ
+
 pca_data_scaled <- scale(pca_data)
 ```
 
-# Principal Component Analysis (PCA)
-We prepare numerical data for PCA and verify if this method is appropriate by examining variable correlations.
-
-## Preparing Data for PCA
-We select only numerical columns and standardize the data.
-
-```{r prepare-pca-data}
-pca_data <- data %>% select(where(is.numeric))
-# Impute missing values with column means
-pca_data[is.na(pca_data)] <- apply(pca_data, 2, function(x) mean(x, na.rm = TRUE))
-# Standardize data
-pca_data_scaled <- scale(pca_data)
-```
 ## Checking Correlations
 We check correlations between variables to determine if PCA is appropriate.
 
