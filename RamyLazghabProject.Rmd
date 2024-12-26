@@ -10,188 +10,278 @@ This report explores how the alignment between an individual's current role and 
 
 ```{r setup, include=FALSE}
 # Load necessary libraries
-library(tidyverse)
-library(FactoMineR)
-library(factoextra)
-library(corrplot)
-library(dplyr)
+library(tidyverse)  # Data manipulation
+library(FactoMineR) # PCA and MCA functions
+library(factoextra) # Visualization for PCA and MCA
+library(corrplot)   # Correlation plot
+library(dplyr)      # Additional data manipulation functions
 ```
 
 # Data Loading
 We load the dataset from a CSV file and perform an initial inspection to understand its structure.
 
 ```{r load-data}
+# Load the dataset
 data <- read.csv("Data.csv", header = TRUE, sep = ",", fileEncoding = "ISO-8859-1")
 
-# Inspect the dataset
-str(data)          # Structure of the dataset
-summary(data)      # Summary statistics
-head(data)         # First few rows
-# Check for duplicates
+# Inspect the structure and content of the dataset
+str(data)          # View structure of the dataset
+summary(data)      # Get summary statistics
+head(data)         # Display the first few rows
+
+# Remove duplicates if any
 data <- distinct(data)
 ```
 
 # Data Preprocessing
 We recode Likert-scale responses and Yes/No(oui/Non) columns and prepare subsets of data for PCA(ACP) and MCA(ACM).
 
-## Recoding Likert Responses
-Likert responses in the "Pertinence," "Utilisation," and "Necessite" columns are recoded into numeric values.
+## Bloc 1: Pertinence(Pertinence ) (PCA)
+This block processes and analyzes the "Pertinence" columns.
 
-```{r recode-likert}
-# Recode Likert responses for Pertinence columns
+```{r pertinence-pca}
+# Select Pertinence-related columns
 pertinence_columns <- grep("Pertinence", names(data), value = TRUE)
-data <- data %>%
-  mutate(across(all_of(pertinence_columns), 
+pertinence_data <- data %>%
+  select(all_of(pertinence_columns)) %>%
+  # Recode Likert responses into numeric values: pdtd -> 1, Neutre -> 2, tafd -> 3
+  mutate(across(everything(), 
                 ~ recode(., 
                          "pdtd" = 1, 
                          "Neutre" = 2, 
                          "tafd" = 3, 
                          .default = NA_real_)))
 
-# Recode Likert responses for Utilisation columns
-utilisation_columns <- grep("Utilisation", names(data), value = TRUE)
-data <- data %>%
-  mutate(across(all_of(utilisation_columns), 
-                ~ recode(., 
-                         "pdtd" = 1, 
-                         "Neutre" = 2, 
-                         "tafd" = 3, 
-                         .default = NA_real_)))
-
-# Recode Likert responses for Necessite columns
-necessite_columns <- grep("Necessite", names(data), value = TRUE)
-data <- data %>%
-  mutate(across(all_of(necessite_columns), 
-                ~ recode(., 
-                         "pdtd" = 1, 
-                         "Neutre" = 2, 
-                         "tafd" = 3, 
-                         .default = NA_real_)))
-
-# Check the results
-head(data)
-```
-
-## Recoding Yes/No(Oui/Non) Columns
-Yes/No responses in the "Objectifs" columns are recoded to 1 for "Yes" and 0 for "No."
-
-```{r recode-yesno}
-# Select Oui/Non columns
-yesno_columns <- grep("Objectifs", names(data), value = TRUE)
-
-# Recode Yes/No responses to 1 for "Oui" and 0 for "Non"
-data[yesno_columns] <- data[yesno_columns] %>%
-  mutate(across(everything(), ~ recode(., "Oui" = 1, "Non" = 0)))
-
-# Check the transformation
-print(head(data[yesno_columns]))
-```
-
-## Verifying and Saving Preprocessed Data
-We combine all rows and save the preprocessed data into a new CSV file.
-
-```{r save-preprocessed-data}
-write.csv(data, "preprocessed_data.csv", row.names = FALSE)
-```
-
-# Principal Component Analysis (PCA)
-We prepare numerical data for PCA and verify if this method is appropriate by examining variable correlations.
-
-## Preparing Data for PCA
-We select only numerical columns and standardize the data.
-
-```{r prepare-pca-data}
-pca_data <- data %>% select(where(is.numeric))
 # Impute missing values with column means
-pca_data[is.na(pca_data)] <- apply(pca_data, 2, function(x) mean(x, na.rm = TRUE))
+pertinence_data[is.na(pertinence_data)] <- apply(pertinence_data, 2, function(x) mean(x, na.rm = TRUE))
 
-# Standardize the data
-pca_data_scaled <- scale(pca_data)
-```
+# Standardize the data to have zero mean and unit variance
+pertinence_scaled <- scale(pertinence_data)
 
-## Checking Correlations
-We check correlations between variables to determine if PCA is appropriate.
+# Identify and remove constant/zero-variance columns
+col_variances <- apply(pertinence_scaled, 2, var)  # Calculate variances for each column
+pertinence_scaled <- pertinence_scaled[, col_variances > 0]  # Remove columns with zero variance
 
-```{r check-correlations}
-cor_matrix <- cor(pca_data_scaled, use = "complete.obs")
-corrplot(cor_matrix, method = "circle", type = "upper", tl.col = "black", tl.srt = 45)
-```
-
-## Selecting Principal Components
-We evaluate eigenvalues, cumulative variance, and scree plots to determine the number of components to retain.
-
-```{r select-components}
-# Eigenvalues and cumulative variance
-eig <- get_eigenvalue(prcomp(pca_data_scaled))
-print(eig)
-
-# Scree plot for visualizing explained variance
-fviz_screeplot(prcomp(pca_data_scaled), ncp = 10, addlabels = TRUE, ylim = c(0, 50))
-
-# Kaiser criterion: components with eigenvalues > 1
-eig_kaiser <- eig[eig$eigenvalue > 1, ]
-print(paste("Number of components based on Kaiser Criterion:", nrow(eig_kaiser)))
-```
-
-## Performing PCA
-We perform PCA and analyze variable contributions and individual projections.
-
-```{r perform-pca}
 # Perform PCA
-pca_result <- prcomp(pca_data_scaled, center = TRUE, scale. = TRUE)
+pertinence_pca <- prcomp(pertinence_scaled, center = TRUE, scale. = TRUE)
 
-# Summary of PCA
-summary(pca_result)
+# Scree plot to visualize the proportion of variance explained
+fviz_screeplot(pertinence_pca, addlabels = TRUE, ylim = c(0, 50)) +
+  ggtitle("Scree Plot: Pertinence")
 
-# Scree plot
-screeplot(pca_result, main = "Scree Plot", col = "blue")
-
-# Variable analysis
-library(factoextra)
-var <- get_pca_var(pca_result)
-print(var$coord)   # Variable coordinates
-print(var$contrib) # Contributions of variables
-print(var$cos2)    # Cos² values
-
-# Variable biplot
-fviz_pca_var(pca_result, col.var = "cos2") +
+# Variable biplot: Visualize how variables contribute to the principal components
+fviz_pca_var(pertinence_pca, col.var = "cos2") +
   scale_color_gradient2(low = "white", mid = "blue", high = "red", midpoint = 0.6) +
+  theme_minimal() +
+  ggtitle("Variable Contributions: Pertinence")
+
+# Ensure age is treated as a factor (categorical variable)
+data$age_factor <- factor(data$Quel.est.votre.age.., 
+                          levels = c("18-24", "25-34", "35-44", "45-54", "55+", "Autre"))
+
+# Filter the 'age' column to include only complete cases in pertinence_data
+age_filtered <- data$age_factor[complete.cases(pertinence_data)]
+
+# Ensure the length of age_filtered matches the number of individuals in pertinence_scaled
+age_filtered <- age_filtered[1:nrow(pertinence_scaled)]
+
+# Create the PCA plot colored by age with a discrete color palette
+fviz_pca_ind(pertinence_pca, geom = "point", habillage = age_filtered) +
+  scale_color_brewer(palette = "Set3") +
+  ggtitle("Pertinence PCA: Individuals Colored by Age") + 
   theme_minimal()
 
-# Individual analysis
-ind <- get_pca_ind(pca_result)
-print(ind$coord)   # Individual coordinates
-print(ind$cos2)    # Cos² values
-print(ind$contrib) # Contributions of individuals
-
-# Individual biplot
-fviz_pca_ind(pca_result, geom = "point", col.ind = "cos2") +
-  scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0.5) +
+# Create the PCA plot colored by age with custom colors
+fviz_pca_ind(pertinence_pca, geom = "point", habillage = age_filtered) +
+  scale_color_manual(values = c("18-24" = "blue", "25-34" = "green", "35-44" = "red", 
+                               "45-54" = "purple", "55+" = "orange", "Autre" = "gray")) +
+  ggtitle("Pertinence PCA: Individuals Colored by Age") + 
   theme_minimal()
+
+# Individual biplot (colored by education level)
+fviz_pca_ind(pertinence_pca, geom = "point", habillage = data$Quel.est.votre.niveau.d.etude) +
+  scale_color_brewer(palette = "Set1") +
+  ggtitle("Pertinence PCA: Individuals Colored by Education Level") + theme_minimal()
 ```
 
-# Multiple Correspondence Analysis (MCA)
-We prepare categorical data for MCA and analyze relationships between qualitative variables.
+## Bloc 2: Utilisation(Utilisation) (PCA)
+This block processes and analyzes the "Utilisation" columns.
 
-## Preparing Data for MCA(ACM)
+```{r utilisation-pca}
+# Select Utilisation-related columns
+utilisation_columns <- grep("Utilisation", names(data), value = TRUE)
+utilisation_data <- data %>%
+  select(all_of(utilisation_columns)) %>%
+  # Recode Likert responses into numeric values: pdtd -> 1, Neutre -> 2, tafd -> 3
+  mutate(across(everything(), 
+                ~ recode(., 
+                         "pdtd" = 1, 
+                         "Neutre" = 2, 
+                         "tafd" = 3, 
+                         .default = NA_real_)))
 
-```{r prepare-mca-data}
-mca_data <- data %>%
-  select(matches("Objectifs")) %>%
+# Impute missing values with column means
+utilisation_data[is.na(utilisation_data)] <- apply(utilisation_data, 2, function(x) mean(x, na.rm = TRUE))
+
+# Standardize the data to have zero mean and unit variance
+utilisation_scaled <- scale(utilisation_data)
+
+# Identify and remove constant/zero-variance columns
+col_variances <- apply(utilisation_scaled, 2, var)  # Calculate variances for each column
+utilisation_scaled <- utilisation_scaled[, col_variances > 0]  # Remove columns with zero variance
+
+# Perform PCA
+utilisation_pca <- prcomp(utilisation_scaled, center = TRUE, scale. = TRUE)
+
+# Scree plot to visualize the proportion of variance explained
+fviz_screeplot(utilisation_pca, addlabels = TRUE, ylim = c(0, 50)) +
+  ggtitle("Scree Plot: Utilisation")
+
+# Variable biplot: Visualize how variables contribute to the principal components
+fviz_pca_var(utilisation_pca, col.var = "cos2") +
+  scale_color_gradient2(low = "white", mid = "blue", high = "red", midpoint = 0.6) +
+  theme_minimal() +
+  ggtitle("Variable Contributions: Utilisation")
+
+# Individual biplot (colored by age)
+fviz_pca_ind(utilisation_pca, geom = "point", habillage = data$age) +
+  scale_color_brewer(palette = "Set3") +
+  ggtitle("Utilisation PCA: Individuals Colored by Age") + theme_minimal()
+
+# Individual biplot (colored by education level)
+fviz_pca_ind(utilisation_pca, geom = "point", habillage = data$Quel.est.votre.niveau.d.etude) +
+  scale_color_brewer(palette = "Set1") +
+  ggtitle("Utilisation PCA: Individuals Colored by Education Level") + theme_minimal()
+
+```
+
+## Bloc 3: Necessite(Necessity) (PCA)
+This block processes and analyzes the "Necessite" columns.
+
+```{r necessite-pca}
+# Select Necessite-related columns
+necessite_columns <- grep("Necessite", names(data), value = TRUE)
+necessite_data <- data %>%
+  select(all_of(necessite_columns)) %>%
+  # Recode Likert responses into numeric values: pdtd -> 1, Neutre -> 2, tafd -> 3
+  mutate(across(everything(), 
+                ~ recode(., 
+                         "pdtd" = 1, 
+                         "Neutre" = 2, 
+                         "tafd" = 3, 
+                         .default = NA_real_)))
+
+# Impute missing values with column means
+necessite_data[is.na(necessite_data)] <- apply(necessite_data, 2, function(x) mean(x, na.rm = TRUE))
+
+# Standardize the data to have zero mean and unit variance
+necessite_scaled <- scale(necessite_data)
+
+# Identify and remove constant/zero-variance columns
+col_variances <- apply(necessite_scaled, 2, var)  # Calculate variances for each column
+necessite_scaled <- necessite_scaled[, col_variances > 0]  # Remove columns with zero variance
+
+# Perform PCA
+necessite_pca <- prcomp(necessite_scaled, center = TRUE, scale. = TRUE)
+
+# Scree plot to visualize the proportion of variance explained
+fviz_screeplot(necessite_pca, addlabels = TRUE, ylim = c(0, 50)) +
+  ggtitle("Scree Plot: Necessite")
+
+# Variable biplot: Visualize how variables contribute to the principal components
+fviz_pca_var(necessite_pca, col.var = "cos2") +
+  scale_color_gradient2(low = "white", mid = "blue", high = "red", midpoint = 0.6) +
+  theme_minimal() +
+  ggtitle("Variable Contributions: Necessite")
+
+# Individual biplot (colored by education level)
+fviz_pca_ind(necessite_pca, geom = "point", habillage = data$Quel.est.votre.niveau.d.etude) +
+  scale_color_brewer(palette = "Set1") +
+  ggtitle("Necessite PCA: Individuals Colored by Education Level") + theme_minimal()
+
+```
+# Select Oui/Non columns for MCA(ACM in FR)
+
+```{r}
+objectifs_columns <- grep("Objectifs", names(data), value = TRUE)
+objectifs_data <- data %>%
+  select(all_of(objectifs_columns)) %>%
+  # Convert to factors for MCA
   mutate(across(everything(), as.factor))
+```
+
 # Remove columns with constant values or all NAs
-mca_data <- mca_data[, sapply(mca_data, function(col) length(unique(na.omit(col))) > 1)]
+```{r}
+objectifs_data <- objectifs_data[, sapply(objectifs_data, function(col) length(unique(na.omit(col))) > 1)]
+
 ```
 
-## Performing MCA
-Describe how categories are distributed and the relationships between individuals and categorical variables.
-
-```{r perform-mca}
-mca_result <- MCA(mca_data, graph = FALSE)
-
-# Visualize MCA results
-fviz_mca_biplot(mca_result, geom = "point", col.var = "blue", col.ind = "red")
+# Perform MCA
+```{r}
+objectifs_mca <- MCA(objectifs_data, graph = FALSE)
 ```
 
-# Conclusion
-This report explored the relationships between academic paths and career satisfaction using PCA and MCA. The results helped identify key dimensions and qualitative relationships in the data.
+
+# Scree plot for MCA
+```{r}
+fviz_screeplot(objectifs_mca, addlabels = TRUE, ylim = c(0, 50)) +
+  ggtitle("Scree Plot: Objectifs MCA")
+```
+
+
+# MCA biplot: Variables and individuals
+```{r}
+fviz_mca_biplot(objectifs_mca, geom = "point", col.var = "blue", col.ind = "red") +
+  ggtitle("MCA Biplot: Objectifs") + theme_minimal()
+```
+
+
+# MCA biplot (colored by age)
+```{r}
+fviz_mca_ind(objectifs_mca, geom = "point", habillage = data$age, palette = "Set3") +
+  ggtitle("Objectifs MCA: Individuals Colored by Age") + theme_minimal()
+```
+
+
+# MCA biplot (colored by education level)
+```{r}
+# Ensure the education level column is a factor
+data$Quel.est.votre.niveau.d.etude <- as.factor(data$Quel.est.votre.niveau.d.etude)
+
+# Create the MCA biplot colored by education level
+fviz_mca_ind(objectifs_mca, geom = "point", habillage = data$Quel.est.votre.niveau.d.etude, palette = "Set1") +
+  ggtitle("Objectifs MCA: Individuals Colored by Education Level") + theme_minimal()
+
+```
+#Data Preparation for AFC
+I select appropriate categorical variables for correspondence analysis.
+to see the study level and the Necessity for Learning new skills
+```{r}
+# Correct column names
+categorical_columns <- grep("Quel.est.votre.niveau.d.etudes..|Necessite.d.un.Apprentissage.ou.d.une.Adaptation....J.ai.du.apprendre.de.nouvelles.compétences.pour.repondre.aux.exigences.de.mon.poste..", colnames(data), value = TRUE)
+
+
+# Select the columns and convert to factors
+afc_data <- data %>%
+  select(all_of(categorical_columns)) %>%
+  mutate(across(everything(), as.factor))  # Ensure variables are factors
+
+# Create the contingency table for AFC
+afc_table <- table(afc_data[[1]], afc_data[[2]])
+
+# Perform Correspondence Analysis (AFC)
+
+afc_result <- CA(afc_table)
+# Plot the Correspondence Analysis
+fviz_ca_biplot(afc_result, 
+               col.row = "blue",    # Color rows (study level)
+               col.col = "red",     # Color columns (Necessity for learning new skills)
+               title = "Correspondence Analysis (AFC)")
+
+# Display results
+summary(afc_result)
+
+```
+#Conclusion
+This analysis demonstrates how the application of PCA and the exploration of the dataset help us understand the relationship between the academic background, role satisfaction, and other variables.
+
