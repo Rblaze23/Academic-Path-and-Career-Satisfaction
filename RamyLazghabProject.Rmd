@@ -7,7 +7,6 @@ output: html_document
 
 # Introduction
 This report explores how the alignment between an individual's current role and their skills or education influences career satisfaction. We use Principal Component Analysis (PCA(ACP)) and Multiple Correspondence Analysis (MCA(ACM)) to examine the data.
-.
 
 ```{r setup, include=FALSE}
 # Load necessary libraries
@@ -17,6 +16,7 @@ library(factoextra)
 library(corrplot)
 library(dplyr)
 ```
+
 # Data Loading
 We load the dataset from a CSV file and perform an initial inspection to understand its structure.
 
@@ -30,6 +30,7 @@ head(data)         # First few rows
 # Check for duplicates
 data <- distinct(data)
 ```
+
 # Data Preprocessing
 We recode Likert-scale responses and Yes/No(oui/Non) columns and prepare subsets of data for PCA(ACP) and MCA(ACM).
 
@@ -70,6 +71,7 @@ data <- data %>%
 # Check the results
 head(data)
 ```
+
 ## Recoding Yes/No(Oui/Non) Columns
 Yes/No responses in the "Objectifs" columns are recoded to 1 for "Yes" and 0 for "No."
 
@@ -88,7 +90,6 @@ print(head(data[yesno_columns]))
 ## Verifying and Saving Preprocessed Data
 We combine all rows and save the preprocessed data into a new CSV file.
 
-
 ```{r save-preprocessed-data}
 write.csv(data, "preprocessed_data.csv", row.names = FALSE)
 ```
@@ -103,11 +104,8 @@ We select only numerical columns and standardize the data.
 pca_data <- data %>% select(where(is.numeric))
 # Impute missing values with column means
 pca_data[is.na(pca_data)] <- apply(pca_data, 2, function(x) mean(x, na.rm = TRUE))
-# Standardize data Z= 
-#X−μ
-#____ = Dp^(−1/2)*(X−I⋅μ)
-#σ
 
+# Standardize the data
 pca_data_scaled <- scale(pca_data)
 ```
 
@@ -118,9 +116,9 @@ We check correlations between variables to determine if PCA is appropriate.
 cor_matrix <- cor(pca_data_scaled, use = "complete.obs")
 corrplot(cor_matrix, method = "circle", type = "upper", tl.col = "black", tl.srt = 45)
 ```
+
 ## Selecting Principal Components
 We evaluate eigenvalues, cumulative variance, and scree plots to determine the number of components to retain.
-Explain the "elbow" in the graph to justify the number of components retained.
 
 ```{r select-components}
 # Eigenvalues and cumulative variance
@@ -134,53 +132,47 @@ fviz_screeplot(prcomp(pca_data_scaled), ncp = 10, addlabels = TRUE, ylim = c(0, 
 eig_kaiser <- eig[eig$eigenvalue > 1, ]
 print(paste("Number of components based on Kaiser Criterion:", nrow(eig_kaiser)))
 ```
+
 ## Performing PCA
-We perform PCA and visualize the first two components.
-Discuss how variables are grouped and their alignment with axes (e.g., positive/negative correlations, key contributors).
+We perform PCA and analyze variable contributions and individual projections.
 
-```{r}
-# Variable coordinates and contributions
+```{r perform-pca}
+# Perform PCA
+pca_result <- prcomp(pca_data_scaled, center = TRUE, scale. = TRUE)
+
+# Summary of PCA
+summary(pca_result)
+
+# Scree plot
+screeplot(pca_result, main = "Scree Plot", col = "blue")
+
+# Variable analysis
+library(factoextra)
 var <- get_pca_var(pca_result)
-print(var$coord)   # Coordinates of variables
+print(var$coord)   # Variable coordinates
 print(var$contrib) # Contributions of variables
-print(var$cos2)    # Cos² (quality of representation)
+print(var$cos2)    # Cos² values
 
-# Visualization of variables
+# Variable biplot
 fviz_pca_var(pca_result, col.var = "cos2") +
   scale_color_gradient2(low = "white", mid = "blue", high = "red", midpoint = 0.6) +
   theme_minimal()
 
-```
-Map individuals and explore clusters:
-Identify clusters or patterns among individuals and how they relate to components.
-```{r}
-# Individual coordinates, cos², and contributions
+# Individual analysis
 ind <- get_pca_ind(pca_result)
-print(ind$coord)   # Coordinates of individuals
+print(ind$coord)   # Individual coordinates
 print(ind$cos2)    # Cos² values
 print(ind$contrib) # Contributions of individuals
 
-# Visualization of individuals
+# Individual biplot
 fviz_pca_ind(pca_result, geom = "point", col.ind = "cos2") +
   scale_color_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0.5) +
   theme_minimal()
-
 ```
 
-## Performing PCA
-We perform PCA and visualize the first two components.
-
-```{r perform-pca}
-pca_result <- prcomp(pca_data_scaled, center = TRUE, scale. = TRUE)
-# Summary of PCA
-summary(pca_result)
-# Scree plot
-screeplot(pca_result, main = "Scree Plot", col = "blue")
-# Plot first two principal components
-plot(pca_result$x[, 1:2], col = "blue", pch = 16, main = "PCA - First Two Components")
-```
 # Multiple Correspondence Analysis (MCA)
 We prepare categorical data for MCA and analyze relationships between qualitative variables.
+
 ## Preparing Data for MCA(ACM)
 
 ```{r prepare-mca-data}
@@ -190,13 +182,16 @@ mca_data <- data %>%
 # Remove columns with constant values or all NAs
 mca_data <- mca_data[, sapply(mca_data, function(col) length(unique(na.omit(col))) > 1)]
 ```
+
 ## Performing MCA
 Describe how categories are distributed and the relationships between individuals and categorical variables.
 
 ```{r perform-mca}
 mca_result <- MCA(mca_data, graph = FALSE)
-# Visualize MCA(ACM) results
+
+# Visualize MCA results
 fviz_mca_biplot(mca_result, geom = "point", col.var = "blue", col.ind = "red")
 ```
+
 # Conclusion
 This report explored the relationships between academic paths and career satisfaction using PCA and MCA. The results helped identify key dimensions and qualitative relationships in the data.
