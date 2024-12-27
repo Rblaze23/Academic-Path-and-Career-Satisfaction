@@ -6,7 +6,7 @@ output: html_document
 ---
 
 # Introduction
-This report explores how the alignment between an individual's current role and their skills or education influences career satisfaction. We use Principal Component Analysis (PCA(ACP)) and Multiple Correspondence Analysis (MCA(ACM)) to examine the data.
+This study examines how well individuals' current professional roles align with their academic backgrounds and skills, and how this alignment impacts career satisfaction. To explore this, we employ Principal Component Analysis (PCA) and Multiple Correspondence Analysis (MCA) as key analytical methods. These techniques help uncover patterns in the data and provide insights into the relationships between variables.
 
 ```{r setup, include=FALSE}
 # Load necessary libraries
@@ -18,7 +18,7 @@ library(dplyr)      # Additional data manipulation functions
 ```
 
 # Data Loading
-We load the dataset from a CSV file and perform an initial inspection to understand its structure.
+First, we start by loading our dataset and taking a closer look at its structure and contents. This step ensures we understand what the data looks like and helps us identify any duplicates or inconsistencies.
 
 ```{r load-data}
 # Load the dataset
@@ -34,10 +34,9 @@ data <- distinct(data)
 ```
 
 # Data Preprocessing
-We recode Likert-scale responses and Yes/No(oui/Non) columns and prepare subsets of data for PCA(ACP) and MCA(ACM).
-
-## Bloc 1: Pertinence(Pertinence ) (PCA)
-This block processes and analyzes the "Pertinence" columns.
+To make the data ready for analysis, we preprocess it by recoding responses, handling missing values, and standardizing the data. This ensures that our analyses are accurate and meaningful.
+## Bloc 1: Pertinence (Relevance)(PCA)
+Here, we focus on understanding how respondents perceive the relevance of their skills and education in their current roles. Using PCA, we explore patterns and visualize the relationships between variables.
 
 ```{r pertinence-pca}
 # Select Pertinence-related columns
@@ -104,8 +103,8 @@ fviz_pca_ind(pertinence_pca, geom = "point", habillage = data$Quel.est.votre.niv
   ggtitle("Pertinence PCA: Individuals Colored by Education Level") + theme_minimal()
 ```
 
-## Bloc 2: Utilisation(Utilisation) (PCA)
-This block processes and analyzes the "Utilisation" columns.
+## Bloc 2:Utilisation (Usage)(PCA)
+This section looks at how respondents use their skills in their professional lives. PCA helps us analyze the degree to which these skills are utilized.
 
 ```{r utilisation-pca}
 # Select Utilisation-related columns
@@ -156,7 +155,7 @@ fviz_pca_ind(utilisation_pca, geom = "point", habillage = data$Quel.est.votre.ni
 ```
 
 ## Bloc 3: Necessite(Necessity) (PCA)
-This block processes and analyzes the "Necessite" columns.
+In this block, we explore how much individuals feel the need to acquire new skills to adapt to their roles. PCA is applied again to extract valuable insights.
 
 ```{r necessite-pca}
 # Select Necessite-related columns
@@ -200,6 +199,8 @@ fviz_pca_ind(necessite_pca, geom = "point", habillage = data$Quel.est.votre.nive
   ggtitle("Necessite PCA: Individuals Colored by Education Level") + theme_minimal()
 
 ```
+#Multiple Correspondence Analysis (MCA)
+I turn the attention to categorical variables to identify associations and trends. MCA helps me analyze these variables and provides insights into the connections between different categories.
 # Select Oui/Non columns for MCA(ACM in FR)
 
 ```{r}
@@ -253,13 +254,51 @@ fviz_mca_ind(objectifs_mca, geom = "point", habillage = data$Quel.est.votre.nive
   ggtitle("Objectifs MCA: Individuals Colored by Education Level") + theme_minimal()
 
 ```
-#Data Preparation for AFC
+#Correspondence Analysis (AFC) in the Project
+
+##Objective
+Correspondence Analysis (AFC) was applied to investigate the relationship between respondents' educational levels and their perceived need for learning or adaptation in their current roles. This analysis helps to visualize and interpret the associations between these categorical variables in a low-dimensional space.
+
+##Steps and Implementation
+
+###Data Preparation
+
+The analysis focused on two key survey variables:
+"Quel est votre niveau d'études?": Represents the respondent's educational level.
+"Nécessité d'un apprentissage ou d'une adaptation": Indicates whether the respondent needed to acquire new skills to meet job requirements.
+These columns were extracted from the dataset and converted into factors to ensure compatibility with AFC requirements.
+### Contingency Table Creation
+
+A contingency table was constructed to summarize the frequency of co-occurrence between the educational levels and the necessity of learning. This table is central to AFC as it quantifies the relationships between the categories of the two variables.
+### Profile Calculations
+
+Row Profiles: Each row's frequencies were normalized relative to the total for that row, allowing the analysis of distributions across columns for a given educational level.
+Column Profiles: Each column's frequencies were normalized relative to the total for that column, providing insights into how respondents needing adaptation are distributed across educational levels.
+### Performing the AFC
+
+AFC was conducted using the CA function from the FactoMineR package. This process decomposes the contingency table into principal components, enabling a geometric representation of the categorical data in a two-dimensional space.
+###Visualization
+
+A biplot was generated to visualize the results, where:
+Rows (educational levels) are represented in blue.
+Columns (necessity for learning) are represented in red.
+This plot highlights the proximity between categories, revealing patterns such as which educational levels are strongly associated with needing new skills.
+###Summary of Results
+
+The detailed summary includes:
+The contribution of each dimension to the variance.
+The quality of representation for each category.
+Inertia values, which indicate the importance of each dimension in explaining the relationship between variables.
+##Insights Gained
+The AFC visualization helps uncover latent relationships between educational levels and the need for skill acquisition.
+Categories closer together in the biplot indicate stronger associations, while those further apart suggest weaker or no relationship.
+
+####Data Preparation for AFC
 I select appropriate categorical variables for correspondence analysis.
 to see the study level and the Necessity for Learning new skills
 ```{r}
-# Correct column names
+# Select columns for Correspondence Analysis
 categorical_columns <- grep("Quel.est.votre.niveau.d.etudes..|Necessite.d.un.Apprentissage.ou.d.une.Adaptation....J.ai.du.apprendre.de.nouvelles.compétences.pour.repondre.aux.exigences.de.mon.poste..", colnames(data), value = TRUE)
-
 
 # Select the columns and convert to factors
 afc_data <- data %>%
@@ -269,19 +308,37 @@ afc_data <- data %>%
 # Create the contingency table for AFC
 afc_table <- table(afc_data[[1]], afc_data[[2]])
 
-# Perform Correspondence Analysis (AFC)
+# Display the contingency table
+cat("Contingency Table:\n")
+print(afc_table)
 
+# Perform Correspondence Analysis (AFC)
 afc_result <- CA(afc_table)
-# Plot the Correspondence Analysis
+
+# Row profiles (profile lines): Proportions for each row relative to the total of the respective row
+row_profiles <- prop.table(afc_table, margin = 1)
+cat("\nRow Profiles (Profile Lines):\n")
+print(row_profiles)
+
+# Column profiles (profile columns): Proportions for each column relative to the total of the respective column
+col_profiles <- prop.table(afc_table, margin = 2)
+cat("\nColumn Profiles (Profile Columns):\n")
+print(col_profiles)
+
+# Plot the Correspondence Analysis biplot
 fviz_ca_biplot(afc_result, 
                col.row = "blue",    # Color rows (study level)
                col.col = "red",     # Color columns (Necessity for learning new skills)
                title = "Correspondence Analysis (AFC)")
 
-# Display results
+# Display detailed results of the Correspondence Analysis
+cat("\nSummary of Correspondence Analysis:\n")
 summary(afc_result)
 
 ```
+
 #Conclusion
-This analysis demonstrates how the application of PCA and the exploration of the dataset help us understand the relationship between the academic background, role satisfaction, and other variables.
+This study sheds light on how well academic pathways align with professional requirements and satisfaction. The analyses reveal patterns that can guide education policies and career planning, fostering a better match between skills and roles. By employing advanced statistical methods, this project contributes to the ongoing discourse on optimizing educational and professional outcomes.
+
+In future work, further investigations could include larger datasets, longitudinal analyses, or more nuanced metrics of career satisfaction to deepen these findings.
 
